@@ -26,11 +26,33 @@ class HikiHTMLRender < Redcarpet::Render::HTML
       "<h#{level}>#{text}</h#{level}>"
   end
 
-  def paragraph(text)
-#      s = @use_wiki_name ? text.gsub(/\b(?:[A-Z]+[a-z\d]+){2,}\b/, %Q|<a href="\\1">\\1</a>|) : text
-#      s = s.gsub(/\[\[([^\]]+?)\]\]/, %Q|<a href="\\1">\\1</a>|)
-#     %Q|<p>#{s}</p>|
-     %Q|<p>#{text}</p>|
+  WIKI_LINK_RE = /\[\[.+?\]\]/
+  WIKI_NAME_RE = /\b(?:[A-Z]+[a-z\d]+){2,}\b/
+  def paragraph(txt)
+      re = /(#{WIKI_LINK_RE})|(#{WIKI_NAME_RE})/xo
+      buf = ""
+      str = txt
+      while m = re.match(str)
+      	buf << m.pre_match
+	str = m.post_match
+
+	wiki_link, wiki_name = m[1,2]
+	if wiki_link
+	   buf << compile_wiki_link(wiki_link[2...-2])
+	elsif wiki_name
+	   buf << %Q|<a href="#{wiki_name}">#{wiki_name}</a>|
+	end
+      end
+      buf << str
+      %Q|<p>#{buf}</p>\n|
+  end
+
+  def compile_wiki_link(link)
+     if m = /\A(?>[^|\\]+|\\.)*\|/.match(link)
+       %Q|<a href="#{m.post_match}">#{m[0].chop}</a>|
+     else
+       %Q|<a href="#{link}">#{link}</a>|
+     end
   end
 
   def preprocess(full_document)
