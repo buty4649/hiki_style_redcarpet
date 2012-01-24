@@ -3,7 +3,6 @@
 #license::	GNU Public License v2.0
 #
 
-require 'stringio'
 require 'strscan'
 require 'rubygems'
 require 'redcarpet'
@@ -18,41 +17,25 @@ class HikiHTMLRender < Redcarpet::Render::HTML
   def initialize( top_level = 2, extensions = {}  )
       @top_level = top_level - 1
       @use_wiki_name = extensions[:use_wiki_name] || true
-      super(extensions)
+      super(extensions.merge(:filter_html => true))
   end
 
   def header(text, header_level)
       level = header_level + @top_level
-      "<h#{level}>#{text}</h#{level}>"
+      %Q|<h#{level}>#{parse_wiki_name(text)}</h#{level}>\n|
   end
 
-  WIKI_LINK_RE = /\[\[.+?\]\]/
-  WIKI_NAME_RE = /\b(?:[A-Z]+[a-z\d]+){2,}\b/
-  def paragraph(txt)
-      re = /(#{WIKI_LINK_RE})|(#{WIKI_NAME_RE})/xo
-      buf = ""
-      str = txt
-      while m = re.match(str)
-      	buf << m.pre_match
-	str = m.post_match
-
-	wiki_link, wiki_name = m[1,2]
-	if wiki_link
-	   buf << compile_wiki_link(wiki_link[2...-2])
-	elsif wiki_name
-	   buf << %Q|<a href="#{wiki_name}">#{wiki_name}</a>|
-	end
-      end
-      buf << str
-      %Q|<p>#{buf}</p>\n|
+  def list_item(text, list_type)
+      %Q|<li>#{parse_wiki_name(text)}</li>\n|
   end
 
-  def compile_wiki_link(link)
-     if m = /\A(?>[^|\\]+|\\.)*\|/.match(link)
-       %Q|<a href="#{m.post_match}">#{m[0].chop}</a>|
-     else
-       %Q|<a href="#{link}">#{link}</a>|
-     end
+  def table_cell(content, alignment)
+      attr = alignment && %Q| align="#{alignment}"|
+      %Q|<td#{attr}>#{parse_wiki_name(content)}</td>\n|
+  end
+
+  def paragraph(text)
+      %Q|<p>#{parse_wiki_name(text)}</p>\n|
   end
 
   def preprocess(full_document)
@@ -65,6 +48,42 @@ class HikiHTMLRender < Redcarpet::Render::HTML
       }.gsub(/&lt;!-- \0(\d+)\0 --&gt;/) {
          %Q(<span class="plugin">{{#{escape_html(plugin_block($1.to_i))}}}</span>)
       }
+  end
+
+  HTML_RE = /<[^'">]+(?:\s|"[^"]*"|'[^']*'|)*>[^<]+?<\/[^>]+?>/
+  WIKI_LINK_RE = /\[\[.+?\]\]/
+  WIKI_NAME_RE = /\b(?:[A-Z]+[a-z\d]+){2,}\b/
+  def parse_wiki_name(text)
+      re = lambda {
+      	if @use_wiki_name
+          /(#{HTML_RE})|(#{WIKI_LINK_RE})|(#{WIKI_NAME_RE})/xo
+	else
+          /(#{HTML_RE})|(#{WIKI_LINK_RE})/xo
+	end
+      }.call
+      buf = ""
+      str = text
+      while m = re.match(str)
+      	buf << m.pre_match
+	str = m.post_match
+
+	wiki_link, wiki_name = m[2,3]
+	if wiki_link
+	   buf << lambda {|link|
+             if m = /\A(?>[^|\\]+|\\.)*\|/.match(link)
+               %Q|<a href="#{m[0].chop}">#{m.post_match}</a>|
+             else
+               %Q|<a href="#{link}">#{link}</a>|
+             end
+	   }.call(wiki_link[2...-2])
+	elsif wiki_name
+	   buf << %Q|<a href="#{wiki_name}">#{wiki_name}</a>|
+	else
+	   buf << m[0]
+	end
+      end
+      buf << str
+      buf.chomp
   end
 
   def valid_plugin_syntax?(code)
@@ -143,7 +162,7 @@ module Hiki
 
     def parse( s, top_level = 2 )
       render = HikiHTMLRender.new(top_level, :use_wiki_name => @use_wiki_name)
-      markdown = Redcarpet::Markdown.new(render,:autolink => false, :space_after_headers => true,:fenced_code_blocks => true, :tables => true, :strikethrough => true, :superscript => true)
+      markdown = Redcarpet::Markdown.new(render,:autolink => true, :space_after_headers => true,:fenced_code_blocks => true, :tables => true, :strikethrough => true, :superscript => true)
       markdown.render(s)
     end
   end
