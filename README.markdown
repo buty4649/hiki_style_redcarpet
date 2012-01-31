@@ -19,15 +19,16 @@ hiki_style_redcarpet
 	1. gem install redcarpet
 
 * hiki_style_redcarpetのインストール
-	1. hiki_style_redcarpet/redcarpet を、HikiRoot/style へコピーする
+	1. hiki_style_redcarpet/redcarpet を、*HikiRoot*/style へコピーする
 	2. hikiconf.rb の@style変数をredcarpet に変更する
-		<code>
+		
+		~~~
 		編集前:
 		#@style = 'default'
 		
 		編集後:
-		@style = 'redcarpet'	
-		</code>
+		@style = 'redcarpet'
+		~~~
 
 同梱のTextFormattingRules を同名のWikiページに貼り付けて保存すると編集ページから参照できて便利です。
 
